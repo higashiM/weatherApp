@@ -1,73 +1,124 @@
 import React from "react";
+import styled from "styled-components";
+
 import Stats from "./components/Stats";
 import "./App.css";
-import EventsExample from "./components/Map";
+import AppMap from "./components/Map";
 import Axios from "axios";
+import distance from "./components/distanceUtil";
 
-import iconUrlOrange from "./components/icons/img/marker-icon-2x-orange.png";
+import mapIcons from "./components/icons/js/icons.js";
+import logo from "./components/vw-bus-clipart-1.png";
 
-import iconUrlViolet from "./components/icons/img/marker-icon-2x-violet.png";
+import apiKey from "./components/apiKey";
+
+//hideAPIkey
+//save function
+//sortfunction
+//highlighting temp
+
 class App extends React.Component {
   state = {
-    latlng1: {
-      lat: 51.505,
-      lng: -0.09,
+    latlngArr: [],
+    weathers: [],
+    myLocation: {
+      lng: -2.24,
+      lat: 53.47,
     },
-    latlng2: {
-      lat: 51.505,
-      lng: -0.09,
-    },
+    setHome: false,
     isloading: true,
-    apiKey: "81b98969469de05047b6e279ed69877d",
+    apiKey: apiKey,
   };
 
   componentDidMount() {
-    console.log("mounted!");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const latlng = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        this.setState({ myLocation: latlng });
+        this.setLocation(this.state.myLocation);
+      },
+      (error) => {
+        alert(
+          "location not found defaulting home to NC HQ: lon: -2.24 lat: 53.47"
+        );
+        console.log(error);
+        this.setLocation(this.state.myLocation);
+      },
+      { timeout: 5000 }
+    );
   }
 
-  setLocation = (latlng1, latlng2) => {
-    this.setState({
-      hasLocation: true,
-      latlng1: latlng1,
-      latlng2: latlng2,
-    });
-    console.log(this.state);
-    this.fetchData(latlng1, latlng2, this.state.apiKey);
+  setLocation = (newlatlng) => {
+    this.fetchData(newlatlng, this.state.apiKey);
   };
 
-  fetchData = (latlng1, latlng2, apiKey) => {
-    const gettext1 = `https://api.openweathermap.org/data/2.5/weather?lat=${latlng2.lat}&lon=${latlng2.lng}&appid=${apiKey}`;
-    const gettext2 = `https://api.openweathermap.org/data/2.5/weather?lat=${latlng1.lat}&lon=${latlng2.lng}&appid=${apiKey}`;
+  fetchData = (latlng, apiKey) => {
+    const gettext = `https://api.openweathermap.org/data/2.5/weather?lat=${latlng.lat}&lon=${latlng.lng}&appid=${apiKey}`;
     //5 day forecast api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={your api key}
-    Promise.all([Axios.get(gettext1), Axios.get(gettext2)])
-      .then(([response1, response2]) => {
-        console.log("fdata", response1, response2);
-        return this.setState({
-          weathers1: response1.data,
-          weathers2: response2.data,
-          isloading: false,
+    Axios.get(gettext)
+      .then((response) => {
+        console.log(response.data);
+        return this.setState((currentState) => {
+          let dist = distance(
+            latlng.lat,
+            latlng.lng,
+            currentState.myLocation.lat,
+            currentState.myLocation.lng,
+            "K"
+          );
+
+          dist = Math.floor(dist);
+          response.data = {
+            ...response.data,
+            icon: mapIcons[currentState.weathers.length % 8],
+            distance: dist,
+            latlng: latlng,
+          };
+          return {
+            weathers: [...currentState.weathers, response.data],
+          };
         });
       })
       .catch((error) => console.log(error));
   };
 
   render() {
-    return (
-      <div className="App">
-        <h1>The Weather</h1>
+    const Title = styled.h1`
+      font-size: 1.5em;
+      text-align: center;
+      color: violet;
+    `;
+    const Wrapper = styled.section`
+      padding: 0.5em;
+      background: pink;
+    `;
 
-        <img src={iconUrlViolet}></img>
-        <Stats
-          weathers={this.state.weathers1}
-          isloading={this.state.isloading}
-        />
-        <img src={iconUrlOrange}></img>
-        <Stats
-          weathers={this.state.weathers2}
-          isloading={this.state.isloading}
-        />
-        <EventsExample setLocation={this.setLocation} />
-      </div>
+    return (
+      <main>
+        <Wrapper>
+          <Title>
+            DAY TRIPPER
+            <img src={logo} height="25" width="50" alt="vw van logo"></img>
+          </Title>
+        </Wrapper>
+
+        <div className="App">
+          <Stats
+            weathers={this.state.weathers}
+            isloading={this.state.isloading}
+          />
+
+          <AppMap
+            setLocation={this.setLocation}
+            weathers={this.state.weathers}
+            handleLocationFound={this.handleLocationFound}
+            setHome={this.state.setHome}
+          />
+        </div>
+      </main>
     );
   }
 }
